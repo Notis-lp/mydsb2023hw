@@ -67,25 +67,54 @@ glimpse(mass_shootings)
 -   Generate a data frame that summarizes the number of mass shootings per year.
 
 ```{r}
-
+#creating a data frame that contains the number of mass shootings per year
+mass_shootings_per_year <- mass_shootings %>% 
+  group_by(year) %>% 
+  summarise('No. of mass shootings'=n())
 ```
 
 -   Generate a bar chart that identifies the number of mass shooters associated with each race category. The bars should be sorted from highest to lowest and each bar should show its number.
 
 ```{r}
-
+#cleaning the data
+mass_shootings <- mass_shootings %>% 
+  mutate(race  = case_when(race %in% c("white") ~ "White", TRUE ~ race)) 
+#creating the plot
+mass_shootings %>% 
+  mutate(race = fct_rev(fct_infreq(race))) %>%
+  ggplot(aes(y=race))+
+  geom_bar()+
+  theme_minimal(base_size=6)
 ```
 
 -   Generate a boxplot visualizing the number of total victims, by type of location.
 
 ```{r}
-
+#cleaning the data (location 8 variable)
+mass_shootings <- mass_shootings %>% 
+  mutate(location...8  = case_when(location...8 %in% c("workplace") ~ "Workplace",
+                                   location...8 %in% c("\nWorkplace") ~ "Workplace",
+                                   location...8 %in% c("Other\n") ~ "Other",
+                                   TRUE ~ location...8)) 
+#counting no of mass shootings by category and creating the plot
+mass_shootings %>% 
+  group_by(location...8) %>% 
+  summarise('Sum'=n()) %>% 
+  ggplot(aes(x=location...8, y=Sum))+
+  geom_boxplot()+
+  labs(x="Location")
 ```
 
 -   Redraw the same plot, but remove the Las Vegas Strip massacre from the dataset.
 
 ```{r}
-
+#making a better plot 
+mass_shootings %>% 
+  mutate(location...8 = fct_rev(fct_infreq(location...8))) %>%
+  ggplot(aes(y=location...8))+
+  geom_bar()+
+  labs(y="Location", title = "Workplace is the most dangerous place for mass shootings to occur")+
+  theme_minimal(base_size=6)
 ```
 
 ### More open-ended questions
