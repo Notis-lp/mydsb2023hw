@@ -124,14 +124,47 @@ Address the following questions. Generate appropriate figures/tables to support 
 -   How many white males with prior signs of mental illness initiated a mass shooting after 2000?
 
 ```{r}
+#cleaning the data (gender and prior_signs_mental_health_issues variables)
+mass_shootings <- mass_shootings %>% 
+  mutate(gender  = case_when(gender %in% c("M") ~ "Male",
+                                   TRUE ~ gender)) %>% 
+  mutate(prior_signs_mental_health_issues  = case_when(prior_signs_mental_health_issues %in% c("yes") ~ "Yes",
+                                   TRUE ~ prior_signs_mental_health_issues)) 
 
+#
+mass_shootings %>% 
+  filter(race=="White" 
+         & gender == "Male" 
+         & year>2000 
+         & prior_signs_mental_health_issues=="Yes") %>% 
+  count()
 ```
 25  white males with prior signs of mental illness initiated a mass shooting after 2000.
 
 -   Which month of the year has the most mass shootings? Generate a bar chart sorted in chronological (natural) order (Jan-Feb-Mar- etc) to provide evidence of your answer.
 
 ```{r}
+#transforming character to date 
+mass_shootings <-mass_shootings %>% 
+  mutate(date = as.Date(date, format = "%m/%d/%y"))
+#calxulating the shootings per month 
+shootings_month <- mass_shootings %>% 
+  group_by(month(date)) %>% 
+  summarise('shootings_per_month'=n()) %>% 
+  rename("month" = `month(date)`) %>% 
+  #adding a column with the months abbriviations
+  mutate('m'=month.abb) 
+  
+#finding the month with the most shootings
+shootings_month %>% 
+  slice_max(shootings_per_month)
 
+#creating bar chart
+shootings_month %>%
+  mutate(m = fct_reorder(m,month)) %>% 
+  ggplot(aes(x=m, y=shootings_per_month))+
+  geom_col()+
+  labs(y= "No. of shootings", title = "Seasonality even in shootings")
 ```
 The months with the most shootings are February, June and November.
 
@@ -139,8 +172,52 @@ The months with the most shootings are February, June and November.
 -   How does the distribution of mass shooting fatalities differ between White and Black shooters? What about White and Latino shooters?
 
 ```{r}
+#creating a data frame that contains black, white and the number fatalities in each incident 
+r <- mass_shootings %>% 
+  filter(race == 'White' | race=='Black') %>% 
+  group_by(race) %>% 
+  summarise('fatalities' = fatalities)
 
+#conducting a t-test
+t.test(r$fatalities~r$race)
+#counting the number of total fatalities 
+r %>% 
+  summarise(sum=sum(fatalities))
+#counting the number of incidents by race
+r %>% 
+  count()
+
+#creating a data frame that contains latino, white and the number fatalities in each incident
+r2 <- mass_shootings %>% 
+  filter(race == 'White' | race=='Latino') %>% 
+  group_by(race) %>% 
+  summarise('fatalities' = fatalities)
+#conducting a t-test
+t.test(r2$fatalities~r2$race)
+#counting the number of total fatalities 
+r2 %>% 
+  summarise(sum=sum(fatalities))
+#counting the number of incidents by race
+r2 %>% 
+  count()
+
+#creating a data frame  that contains latino, white, black, the number 
+#fatalities in each incident and the date
+r_all <- mass_shootings %>% 
+  filter(race == 'White' | race=='Black' |  race=='Latino') %>% 
+  group_by(race) %>% 
+  summarise('fatalities' = fatalities, 'date' = date)
+#visualizing data
+ggplot(r_all, aes(x=date, y=fatalities, color=race))+
+  geom_smooth()
 ```
+Black and white
+By conducting a t-test we can identify that there is a difference between the mean number of fatalities of shootings caused by black people vs white. to be more specific if the race is black the average number of fatalities is 4.93 and if the race is white the number raises to 8.42. The difference is statistically important with t = -3.0091 and p-value = 0.003736. In addition Black people were involved in 16 incidents and caused 79 fatalities while white people were involved in 73 incidents and caused 632 fatalities.
+
+Latino and white
+The difference is not statistically important at a 95 percent confidence interval with t = -1.3857 and p-value = 0.1805. Latino people were involved in 12 incidents and caused 79 fatalities while white people were involved in 75 incidents and caused 632 fatalities. If the race is latino the average number of fatalities is 6.08 and if the race is white the number raises to 8.42.
+
+In order to understand the data better we create the above plot. As we can see the number of fatalities caused by white people is pretty stable over time while the number is declining in the case of black people. Regarding latino people we can identify a big spike in 2022 but over the number of fatalities is quite similar to that of white people.
 
 ### Very open-ended
 
