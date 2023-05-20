@@ -328,25 +328,67 @@ The data dictionary is as follows
 -   In this dataset, how likely are fraudulent transactions? Generate a table that summarizes the number and frequency of fraudulent transactions per year.
 
 ```{r}
-
+card_fraud %>% 
+  group_by(trans_year) %>% 
+  summarise('frauds' = sum(is_fraud),'total' = n()) %>% 
+  mutate('percentage'=frauds/total)
 ```
+In 2019 2.721 transactions were fraudulent 0.5685%
+In 2020 1215 transactions were fraudulent 0.6316%
 
 -   How much money (in US\$ terms) are fraudulent transactions costing the company? Generate a table that summarizes the total amount of legitimate and fraudulent transactions per year and calculate the % of fraudulent transactions, in US\$ terms.
 
 ```{r}
-
+#calculating the number of fraudulent transactions, the total number 
+#of transactions and the % of fraudulent transactions
+card_fraud %>% 
+  group_by(trans_year,is_fraud) %>% 
+  summarise('fraudulent' = sum(amt)) %>% 
+  ungroup() %>% 
+  group_by(trans_year) %>% 
+  mutate('total'=sum(fraudulent)) %>% 
+  filter(is_fraud==1) %>% 
+  mutate('percentage'=fraudulent/total) %>% 
+  select(-is_fraud)
 ```
 
 -   Generate a histogram that shows the distribution of amounts charged to credit card, both for legitimate and fraudulent accounts. Also, for both types of transactions, calculate some quick summary statistics.
 
 ```{r}
+#adding a column (non numerical) so we can identify if it's fraud or not 
+card_fraud <- card_fraud %>% 
+  mutate(fraud= case_when(is_fraud==1~"Yes",is_fraud==0~"No"))
+#creating the plot
+ggplot(card_fraud, aes(x=amt, color=fraud))+
+  geom_histogram(fill="white", alpha=0.5, position="identity", bins=100)+
+  xlim(0,1000)
 
+#creating a data frame that contains all legitimate transactions 
+legit <- card_fraud %>% 
+  filter(is_fraud==0)
+#creating a data frame that contains all fraudulent transactions 
+fraud <- card_fraud %>% 
+  filter(is_fraud==1)
+#calculating summary statistics for legitimate transactions 
+skimr::skim(legit)
+#calculating summary statistics for fraudulent transactions 
+skimr::skim(fraud)
 ```
+We limit the plot x axis to 1000$ so it is easier to read. Note that the transactions over 500$ uo to 27119.77$ (highest amount in this data set) are fraudulent.
+
 
 -   What types of purchases are most likely to be instances of fraud? Consider category of merchants and produce a bar chart that shows % of total fraudulent transactions sorted in order.
 
 ```{r}
-
+card_fraud %>%
+  group_by(category) %>% 
+  summarise('frauds' = sum(is_fraud),'total' = n()) %>% 
+  mutate('percentage'=frauds/sum(frauds)) %>% 
+  mutate(category = fct_reorder(category,percentage)) %>%
+  ggplot(aes(x=percentage, y=category))+
+  geom_col()+
+  scale_x_continuous(labels = scales::percent)+
+  theme_minimal(base_size=6)
 ```
 
 -   When is fraud more prevalent? Which days, months, hours? To create new variables to help you in your analysis, we use the `lubridate` package and the following code
@@ -487,9 +529,9 @@ There is a lot of explanatory text, comments, etc. You do not need these, so del
 
 # Details
 
--   Who did you collaborate with: TYPE NAMES HERE
--   Approximately how much time did you spend on this problem set: ANSWER HERE
--   What, if anything, gave you the most trouble: ANSWER HERE
+-   Who did you collaborate with: nobody
+-   Approximately how much time did you spend on this problem set: way way too much
+-   What, if anything, gave you the most trouble: not the problem sets, the limited time 
 
 **Please seek out help when you need it,** and remember the [15-minute rule](https://mam2022.netlify.app/syllabus/#the-15-minute-rule){target="_blank"}. You know enough R (and have enough examples of code from class and your readings) to be able to do this. If you get stuck, ask for help from others, post a question on Slack-- and remember that I am here to help too!
 
