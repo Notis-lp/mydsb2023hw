@@ -224,14 +224,63 @@ In order to understand the data better we create the above plot. As we can see t
 -   Are mass shootings with shooters suffering from mental illness different from mass shootings with no signs of mental illness in the shooter?
 
 ```{r}
+#checking the mental health status if it contains the word mental and 
+#creating a new column with the mental health status
+mental <- mass_shootings %>% 
+  mutate(Mental_illness = case_when(
+    grepl("mental",mental_health_details) ~ "yes",
+    mental_health_details == "-" ~"Not available",
+    TRUE ~"no")) %>% 
+  #filtering only for the cases that we have data 
+  filter(Mental_illness =='yes' | Mental_illness =='no')
 
+#conducting a t-test
+t.test(mental$fatalities~mental$Mental_illness)
+#conducting a t-test
+t.test(mental$injured~mental$Mental_illness)
+#conducting a t-test
+t.test(mental$total_victims~mental$Mental_illness)
+
+#finding how many mental illness cases we have
+lenght <- mental %>% 
+  group_by(Mental_illness) %>% 
+  summarise(percent = n())
+
+#assigning the number of incidents with and without mental illness
+l_no <- lenght[[1,2]]
+l_yes <- lenght[[2,2]]
+
+#calculating the percentage of the incidents by race
+mental %>% 
+  group_by(race, Mental_illness) %>% 
+  summarise('count' = n()) %>% 
+  mutate('percent' = case_when(Mental_illness == "no" ~ count/l_no,Mental_illness == "yes" ~ count/l_yes))
+
+#calculating the percentage of the incidents by location
+mental %>% 
+  group_by(location...8, Mental_illness) %>% 
+  summarise('count' = n()) %>% 
+  mutate('percent' = case_when(Mental_illness == "no" ~ count/l_no,Mental_illness == "yes" ~ count/l_yes))
 ```
+We were unable to find a conclusive and statistically important difference between the mass shootings conducted by shooters suffering from mental illness and those who weren't. To be more specific there was no difference in the number of fatalities, injuries and total victims. It seems thought that white people that conduct shootings are mostly mentally ill while latino and black people aren't. In addition, it seems that if the shooting takes place on a religious place or in a school it's more likely that the shooter is mentally ill while that's not the case if it takes place on a military location.
 
 -   Assess the relationship between mental illness and total victims, mental illness and location type, and the intersection of all three variables.
 
 ```{r}
-
+#Chi-sq test
+chisq.test(mental$Mental_illness, mental$location...8, correct=FALSE)
+#creating a data frame that has the number of total victims by type of location and mental illness status
+mental_loc_victims <- mental %>% 
+  group_by(location...8, Mental_illness) %>% 
+  summarise('Total_victims' = sum(total_victims)) 
+#conducting an Anova
+two.way <- aov(Total_victims ~ Mental_illness + location...8, data = mental_loc_victims)
+summary(two.way)
 ```
+
+The analysis was conducted in the previous chunk of code, there is no statistically important difference between the total victims conducted by shooters suffering from mental illness and those who weren't. t = -0.8569, p-value = 0.3938 and the mean number of total victims for shooters that weren't suffering from mental illness is 8.171875 while for those who did is 9.555556.
+Also it seems that if the shooting takes place on a religious place or in a school it's more likely that the shooter is mentally ill while that's not the case if it takes place on a military location. But we don't enough enough data to conduct a conclusive Chi-square analysis to identify the link between the two categorical variables (with our data it seems that they are independent). 
+In order to identify the link among the mental status of the shooter, the location type and the total victims, we conduct an Anova. We identify that the p-values are not statistically significant at a 95% confidence level (Mental illness p-value = 0.466, location type p-value = 0.231) so there is no link among these variables.
 
 Make sure to provide a couple of sentences of written interpretation of your tables/figures. Graphs and tables alone will not be sufficient to answer this question.
 
