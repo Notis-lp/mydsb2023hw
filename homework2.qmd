@@ -393,7 +393,7 @@ card_fraud %>%
 
 -   When is fraud more prevalent? Which days, months, hours? To create new variables to help you in your analysis, we use the `lubridate` package and the following code
 
-<!-- -->
+<!-- -->  
 
     mutate(
       date_only = lubridate::date(trans_date_trans_time),
@@ -411,8 +411,49 @@ card_fraud %>%
         )
 
 ```{r}
+#adding columns month, hour and weekday
+card_fraud <- card_fraud %>%
+  mutate(
+      date_only = lubridate::date(trans_date_trans_time),
+      month_name = lubridate::month(trans_date_trans_time, label=TRUE),
+      hour = lubridate::hour(trans_date_trans_time),
+      weekday = lubridate::wday(trans_date_trans_time, label = TRUE)
+      )
 
+#finding the months with the most fraudulent transactions 
+card_fraud %>%
+  filter(is_fraud==1) %>% 
+  group_by(month_name) %>% 
+  summarise('per_month' = n()) %>% 
+  slice_max(per_month)
+
+#finding the hours with the most fraudulent transactions 
+card_fraud %>%
+  filter(is_fraud==1) %>% 
+  group_by(hour) %>% 
+  summarise('per_hour' = n()) %>% 
+  slice_max(per_hour)
+
+#finding the weekdays with the most fraudulent transactions 
+card_fraud %>%
+  filter(is_fraud==1) %>% 
+  group_by(weekday) %>% 
+  summarise('per_weekday' = n()) %>% 
+  slice_max(per_weekday)
+
+#calculating customer's age
+card_fraud <- card_fraud %>%
+  mutate(age = interval(dob, trans_date_trans_time) / years(1),)
+
+#testing if there is a link between age and fraud 
+t.test(card_fraud$age~card_fraud$fraud)
+  
 ```
+The months with the most fraudulent transactions are March and May
+The hour with the most fraudulent transactions is 23:00
+The weekdays with the most fraudulent transactions is Monday
+
+By conducting a t-test analysis we can identify that older people are more likely to be victims of fraud. With a p-value < 2.2e-16 and t = -10.04 the difference is statistically significant at a 99% confidence level.
 
 -   Is fraud related to distance? The distance between a card holder's home and the location of the transaction can be a feature that is related to fraud. To calculate distance, we need the latidue/longitude of card holders's home and the latitude/longitude of the transaction, and we will use the [Haversine formula](https://en.wikipedia.org/wiki/Haversine_formula) to calculate distance. I adapted code to [calculate distance between two points on earth](https://www.geeksforgeeks.org/program-distance-two-points-earth/amp/) which you can find below
 
@@ -421,7 +462,7 @@ card_fraud %>%
 # code adapted from https://www.geeksforgeeks.org/program-distance-two-points-earth/amp/
 
 
-fraud <- fraud %>%
+card_fraud <- card_fraud %>%
   mutate(
     
     # convert latitude/longitude to radians
@@ -438,7 +479,10 @@ fraud <- fraud %>%
 
   )
 
+#testing if there is a link between distance and fraud instances
+t.test(card_fraud$distance_km~card_fraud$fraud)
 ```
+By conducting a t-test we can identify that there is no link between distance and fraud instances p-value = 0.969.
 
 Plot a boxplot or a violin plot that looks at the relationship of distance and `is_fraud`. Does distance seem to be a useful feature in explaining fraud?
 
