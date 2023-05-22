@@ -23,15 +23,11 @@ library(skimr)
 library(countrycode)
 library(here)
 library(forecast)
+library(ggrepel)
+library(patchwork)
 ```
 
-# Data Visualisation - Exploration
-
-Now that you've demonstrated your software is setup, and you have the basics of data manipulation, the goal of this assignment is to practice transforming, visualising, and exploring data.
-
 # Mass shootings in the US
-
-In July 2012, in the aftermath of a mass shooting in a movie theater in Aurora, Colorado, [Mother Jones](https://www.motherjones.com/politics/2012/07/mass-shootings-map/) published a report on mass shootings in the United States since 1982. Importantly, they provided the underlying data set as [an open-source database](https://www.motherjones.com/politics/2012/12/mass-shootings-mother-jones-full-data/) for anyone interested in studying and understanding this criminal behavior.
 
 ## Obtain the data
 
@@ -101,8 +97,8 @@ mass_shootings %>%
   group_by(location...8) %>% 
   summarise('Sum'=n()) %>% 
   ggplot(aes(x=location...8, y=Sum))+
-  geom_boxplot()+
-  labs(x="Location")
+    geom_boxplot()+
+    labs(x="Location")
 ```
 
 -   Redraw the same plot, but remove the Las Vegas Strip massacre from the dataset.
@@ -128,10 +124,11 @@ Address the following questions. Generate appropriate figures/tables to support 
 mass_shootings <- mass_shootings %>% 
   mutate(gender  = case_when(gender %in% c("M") ~ "Male",
                                    TRUE ~ gender)) %>% 
-  mutate(prior_signs_mental_health_issues  = case_when(prior_signs_mental_health_issues %in% c("yes") ~ "Yes",
-                                   TRUE ~ prior_signs_mental_health_issues)) 
+  mutate(prior_signs_mental_health_issues  = case_when(
+                                    prior_signs_mental_health_issues %in% c("yes") ~ "Yes",
+                                    TRUE ~ prior_signs_mental_health_issues)) 
 
-#
+#counting how many white males with prior signs of mental illness initiated a mass shooting after 2000
 mass_shootings %>% 
   filter(race=="White" 
          & gender == "Male" 
@@ -147,7 +144,7 @@ mass_shootings %>%
 #transforming character to date 
 mass_shootings <-mass_shootings %>% 
   mutate(date = as.Date(date, format = "%m/%d/%y"))
-#calxulating the shootings per month 
+#calculating the shootings per month 
 shootings_month <- mass_shootings %>% 
   group_by(month(date)) %>% 
   summarise('shootings_per_month'=n()) %>% 
@@ -282,19 +279,9 @@ The analysis was conducted in the previous chunk of code, there is no statistica
 Also it seems that if the shooting takes place on a religious place or in a school it's more likely that the shooter is mentally ill while that's not the case if it takes place on a military location. But we don't enough enough data to conduct a conclusive Chi-square analysis to identify the link between the two categorical variables (with our data it seems that they are independent). 
 In order to identify the link among the mental status of the shooter, the location type and the total victims, we conduct an Anova. We identify that the p-values are not statistically significant at a 95% confidence level (Mental illness p-value = 0.466, location type p-value = 0.231) so there is no link among these variables.
 
-Make sure to provide a couple of sentences of written interpretation of your tables/figures. Graphs and tables alone will not be sufficient to answer this question.
-
 # Exploring credit card fraud
 
-We will be using a dataset with credit card transactions containing legitimate and fraud transactions. Fraud is typically well below 1% of all transactions, so a naive model that predicts that all transactions are legitimate and not fraudulent would have an accuracy of well over 99%-- pretty good, no? (well, not quite as we will see later in the course)
-
-You can read more on credit card fraud on [Credit Card Fraud Detection Using Weighted Support Vector Machine](https://www.scirp.org/journal/paperinformation.aspx?paperid=105944)
-
-The dataset we will use consists of credit card transactions and it includes information about each transaction including customer details, the merchant and category of purchase, and whether or not the transaction was a fraud.
-
 ## Obtain the data
-
-The dataset is too large to be hosted on Canvas or Github, so please download it from dropbox https://www.dropbox.com/sh/q1yk8mmnbbrzavl/AAAxzRtIhag9Nc_hODafGV2ka?dl=0 and save it in your `dsb` repo, under the `data` folder
 
 ```{r}
 #| echo: false
@@ -351,6 +338,8 @@ card_fraud %>%
   mutate('percentage'=fraudulent/total) %>% 
   select(-is_fraud)
 ```
+In 2019 fraudulent transactions costed the company $1.423.140 
+In 2020 fraudulent transactions costed the company $651.949
 
 -   Generate a histogram that shows the distribution of amounts charged to credit card, both for legitimate and fraudulent accounts. Also, for both types of transactions, calculate some quick summary statistics.
 
@@ -391,24 +380,7 @@ card_fraud %>%
   theme_minimal(base_size=6)
 ```
 
--   When is fraud more prevalent? Which days, months, hours? To create new variables to help you in your analysis, we use the `lubridate` package and the following code
-
-<!-- -->  
-
-    mutate(
-      date_only = lubridate::date(trans_date_trans_time),
-      month_name = lubridate::month(trans_date_trans_time, label=TRUE),
-      hour = lubridate::hour(trans_date_trans_time),
-      weekday = lubridate::wday(trans_date_trans_time, label = TRUE)
-      )
-
--   Are older customers significantly more likely to be victims of credit card fraud? To calculate a customer's age, we use the `lubridate` package and the following code
-
-<!-- -->
-
-      mutate(
-       age = interval(dob, trans_date_trans_time) / years(1),
-        )
+-   When is fraud more prevalent? Which days, months, hours?
 
 ```{r}
 #adding columns month, hour and weekday
@@ -440,28 +412,26 @@ card_fraud %>%
   group_by(weekday) %>% 
   summarise('per_weekday' = n()) %>% 
   slice_max(per_weekday)
+```
+The months with the most fraudulent transactions are March and May
+The hour with the most fraudulent transactions is 23:00
+The weekdays with the most fraudulent transactions is Monday
 
+-   Are older customers significantly more likely to be victims of credit card fraud? 
+
+```{r}
 #calculating customer's age
 card_fraud <- card_fraud %>%
   mutate(age = interval(dob, trans_date_trans_time) / years(1),)
 
 #testing if there is a link between age and fraud 
 t.test(card_fraud$age~card_fraud$fraud)
-  
 ```
-The months with the most fraudulent transactions are March and May
-The hour with the most fraudulent transactions is 23:00
-The weekdays with the most fraudulent transactions is Monday
-
 By conducting a t-test analysis we can identify that older people are more likely to be victims of fraud. With a p-value < 2.2e-16 and t = -10.04 the difference is statistically significant at a 99% confidence level.
 
--   Is fraud related to distance? The distance between a card holder's home and the location of the transaction can be a feature that is related to fraud. To calculate distance, we need the latidue/longitude of card holders's home and the latitude/longitude of the transaction, and we will use the [Haversine formula](https://en.wikipedia.org/wiki/Haversine_formula) to calculate distance. I adapted code to [calculate distance between two points on earth](https://www.geeksforgeeks.org/program-distance-two-points-earth/amp/) which you can find below
+-   Is fraud related to distance?
 
 ```{r}
-# distance between card holder's home and transaction
-# code adapted from https://www.geeksforgeeks.org/program-distance-two-points-earth/amp/
-
-
 card_fraud <- card_fraud %>%
   mutate(
     
@@ -487,21 +457,6 @@ By conducting a t-test we can identify that there is no link between distance an
 Plot a boxplot or a violin plot that looks at the relationship of distance and `is_fraud`. Does distance seem to be a useful feature in explaining fraud?
 
 # Exploring sources of electricity production, CO2 emissions, and GDP per capita.
-
-There are many sources of data on how countries generate their electricity and their CO2 emissions. I would like you to create three graphs:
-
-## 1. A stacked area chart that shows how your own country generated its electricity since 2000.
-
-You will use
-
-`geom_area(colour="grey90", alpha = 0.5, position = "fill")`
-
-## 2. A scatter plot that looks at how CO2 per capita and GDP per capita are related
-
-## 3. A scatter plot that looks at how electricity usage (kWh) per capita/day GDP per capita are related
-
-We will get energy data from the Our World in Data website, and CO2 and GDP per capita emissions from the World Bank, using the `wbstats`package.
-
 ```{r}
 #| message: false
 #| warning: false
@@ -555,31 +510,141 @@ gdp_percap <- wb_data(country = "countries_only",
   rename(year = date,
          GDPpercap = value)
 ```
+## 1. A stacked area chart that shows how your own country generated its electricity since 2000.
+
+```{r}
+#creating a data frame for greece and transforming it to tidy format
+greece_energy <- energy %>% 
+  filter(country=="Greece" & year>=2000) %>% 
+  pivot_longer(cols=4:12, names_to = "type", values_to = "energy_amount")
+#creating the stacked area chart
+ggplot(greece_energy, aes(x=year, y=energy_amount, fill=type))+
+  geom_area(colour="grey90", alpha = 0.5, position = "fill")+
+  scale_y_continuous(labels = scales::percent)+
+  ylab("Energy %")
+```
+## 2. A scatter plot that looks at how CO2 per capita and GDP per capita are related
+
+```{r}
+#A scatter plot that looks at how CO2 per capita and GDP per capita are related
+
+#adding a unique key to each table in order to merge
+co2_percap$key <- paste(co2_percap$iso3c, co2_percap$year, sep="_")
+gdp_percap$key<-gdp_percap$key <- paste(gdp_percap$iso3c, gdp_percap$year, sep="_")
+
+#joining the two data frames
+per_cap_c02ngdp <- inner_join(co2_percap,gdp_percap, by='key')
+
+#creating the scatter plot
+ggplot(per_cap_c02ngdp, aes(x=co2percap, y=GDPpercap)) +
+  geom_point(alpha=0.3) + 
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)+
+  ylab("GDP per capita")+
+  xlab("CO2 per capita")
+```
+## 3. A scatter plot that looks at how electricity usage (kWh) per capita/day GDP per capita are related
+
+```{r}
+#creating a new column electricity per capita/day
+energy$per_capita_day <-energy$per_capita_electricity/365
+#adding a unique key to each table in order to merge
+energy$key <- paste(energy$iso_code, energy$year, sep="_")
+gdp_percap$key<-gdp_percap$key <- paste(gdp_percap$iso3c, gdp_percap$year, sep="_")
+
+#joining the two data frames
+per_cap_energyngdp <- inner_join(energy,gdp_percap, by='key')
+
+#creating the scatter plot
+ggplot(per_cap_energyngdp, aes(x=per_capita_day, y=GDPpercap)) +
+  geom_point(alpha=0.3) + 
+  ylab("GDP per capita")+
+  xlab("kWh per capita/day")
+```
 
 Specific questions:
 
 1.  How would you turn `energy` to long, tidy format?
-2.  You may need to join these data frames
-    -   Use `left_join` from `dplyr` to [join the tables](http://r4ds.had.co.nz/relational-data.html)
-    -   To complete the merge, you need a unique *key* to match observations between the data frames. Country names may not be consistent among the three dataframes, so please use the 3-digit ISO code for each country
-    -   An aside: There is a great package called [`countrycode`](https://github.com/vincentarelbundock/countrycode) that helps solve the problem of inconsistent country names (Is it UK? United Kingdon? Great Britain?). `countrycode()` takes as an input a country's name in a specific format and outputs it using whatever format you specify.
-3.  Write a function that takes as input any country's name and returns all three graphs. You can use the `patchwork` package to arrange the three graphs as shown below
+yes it helps with the analysis and the ploting. 
+
+2.  Write a function that takes as input any country's name and returns all three graphs. You can use the `patchwork` package to arrange the three graphs as shown below
 
 ![](images/electricity-co2-gdp.png)
+```{r}
+plot <- function(c){
+#Creating stacked area chart that shows how the specified country generated its electricity
+  country_energy <- energy %>% 
+  filter(country=={c}) %>% 
+  pivot_longer(cols=4:12, names_to = "type", values_to = "energy_amount")
+#creating the stacked area chart
+g1 <-  ggplot(country_energy, aes(x=year, y=energy_amount, fill=type))+
+    geom_area(colour="grey90", alpha = 0.5, position = "fill")+
+    scale_y_continuous(labels = scales::percent)+
+    labs(title='Electricity production mix')+
+    ylab(NULL)+
+    xlab(NULL)
 
-# Deliverables
+#Creating a scatter plot that looks at how CO2 per capita and  
+#GDP per capita for the are specified country related
 
-There is a lot of explanatory text, comments, etc. You do not need these, so delete them and produce a stand-alone document that you could share with someone. Knit the edited and completed Quarto Markdown (qmd) file as a Word document (use the "Render" button at the top of the script editor window) and upload it to Canvas. You must be commiting and pushing tour changes to your own Github repo as you go along.
+#adding a unique key to each table in order to merge
+co2_percap$key <- paste(co2_percap$iso3c, co2_percap$year, sep="_")
+gdp_percap$key<-gdp_percap$key <- paste(gdp_percap$iso3c, gdp_percap$year, sep="_")
 
+#joining the two data frames
+per_cap_c02ngdp <- inner_join(co2_percap,gdp_percap, by='key') %>% 
+  filter(country.x=={c})
+
+#creating the scatter plot
+g2 <- ggplot(per_cap_c02ngdp, aes(x=GDPpercap, y=co2percap, label=year.x)) +
+  geom_point() + 
+  geom_text_repel(aes(label = year.x),
+                  box.padding   = 0.35, 
+                  point.padding = 0.5,)+
+  scale_x_continuous(labels = scales::dollar)+
+  labs(title ="CO2 vs GDP per capita")+
+  xlab("GDP per capita")+
+  ylab("CO2 per capita")+
+  theme_bw()
+
+
+
+#creating a scatter plot that looks at how electricity usage 
+#(kWh) per capita/day GDP per capita are related for the specified country related
+
+#filtering to have data only for the specified country
+energy_c <- energy %>% 
+  filter(country=={c})
+#creating a new column electricity per capita/day
+energy_c$per_capita_day <-energy_c$per_capita_electricity/365
+#adding a unique key to the data frame in order to merge
+energy_c$key<-energy_c$key <- paste(energy_c$iso_code, energy_c$year, sep="_")
+
+#joining the two data frames
+per_cap_c02nenergy <- inner_join(co2_percap,energy_c, by='key') 
+
+#creating the scatter plot
+g3 <- ggplot(per_cap_c02nenergy, aes(x=per_capita_day, y=co2percap, label=year.x)) +
+  geom_point() + 
+  geom_text_repel(aes(label = year.x),
+                  box.padding   = 0.35, 
+                  point.padding = 0.5,)+
+  labs(title ="CO2 vs electricity consumption per capita/day")+
+  xlab("Electricity used (kWh) per capita/day")+
+  ylab("CO2 per capita")+
+  theme_bw()
+g1/ (g2|g3)
+}
+
+plot("Germany")
+```
 # Details
 
 -   Who did you collaborate with: nobody
 -   Approximately how much time did you spend on this problem set: way way too much
 -   What, if anything, gave you the most trouble: not the problem sets, the limited time 
 
-**Please seek out help when you need it,** and remember the [15-minute rule](https://mam2022.netlify.app/syllabus/#the-15-minute-rule){target="_blank"}. You know enough R (and have enough examples of code from class and your readings) to be able to do this. If you get stuck, ask for help from others, post a question on Slack-- and remember that I am here to help too!
-
 > As a true test to yourself, do you understand the code you submitted and are you able to explain it to someone else?
+yes
 
 # Rubric
 
