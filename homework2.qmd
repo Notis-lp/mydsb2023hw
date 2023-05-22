@@ -577,11 +577,17 @@ plot <- function(c){
   pivot_longer(cols=4:12, names_to = "type", values_to = "energy_amount")
 #creating the stacked area chart
 g1 <-  ggplot(country_energy, aes(x=year, y=energy_amount, fill=type))+
-    geom_area(colour="grey90", alpha = 0.5, position = "fill")+
+    geom_area(colour="grey90", alpha = 0.5, position = "fill",size=0.3)+
     scale_y_continuous(labels = scales::percent)+
     labs(title='Electricity production mix')+
     ylab(NULL)+
-    xlab(NULL)
+    xlab(NULL)+
+    theme(axis.title = element_text(size = 5),
+    axis.text = element_text(size = 5), axis.text.x = element_text(size = 5),
+    axis.text.y = element_text(size = 5),
+    plot.title = element_text(size = 5),
+    legend.text = element_text(size = 3),
+    legend.title = element_text(size = 3)) 
 
 #Creating a scatter plot that looks at how CO2 per capita and  
 #GDP per capita for the are specified country related
@@ -596,15 +602,19 @@ per_cap_c02ngdp <- inner_join(co2_percap,gdp_percap, by='key') %>%
 
 #creating the scatter plot
 g2 <- ggplot(per_cap_c02ngdp, aes(x=GDPpercap, y=co2percap, label=year.x)) +
-  geom_point() + 
+  geom_point(size=0.3) + 
   geom_text_repel(aes(label = year.x),
                   box.padding   = 0.35, 
-                  point.padding = 0.5,)+
+                  point.padding = 0.5,size=2)+
   scale_x_continuous(labels = scales::dollar)+
   labs(title ="CO2 vs GDP per capita")+
   xlab("GDP per capita")+
   ylab("CO2 per capita")+
-  theme_bw()
+  theme_bw()+
+  theme(axis.title = element_text(size = 5),
+    axis.text = element_text(size = 5), axis.text.x = element_text(size = 5),
+    axis.text.y = element_text(size = 5),
+    plot.title = element_text(size = 5)) 
 
 
 
@@ -624,14 +634,18 @@ per_cap_c02nenergy <- inner_join(co2_percap,energy_c, by='key')
 
 #creating the scatter plot
 g3 <- ggplot(per_cap_c02nenergy, aes(x=per_capita_day, y=co2percap, label=year.x)) +
-  geom_point() + 
+  geom_point(size=0.3) + 
   geom_text_repel(aes(label = year.x),
                   box.padding   = 0.35, 
-                  point.padding = 0.5,)+
+                  point.padding = 0.5,size=2)+
   labs(title ="CO2 vs electricity consumption per capita/day")+
   xlab("Electricity used (kWh) per capita/day")+
   ylab("CO2 per capita")+
-  theme_bw()
+  theme_bw()+
+    theme(axis.title = element_text(size = 5),
+    axis.text = element_text(size = 5), axis.text.x = element_text(size = 5),
+    axis.text.y = element_text(size = 5),
+    plot.title = element_text(size = 5)) 
 g1/ (g2|g3)
 }
 
