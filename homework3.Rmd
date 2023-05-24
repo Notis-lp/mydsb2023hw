@@ -148,6 +148,25 @@ There are 2213 distinct entities.
 
 
 ## Which party has raised the greatest amount of money in each of the years 2020-2022? 
+```{r}
+#creating table parties_db
+parties_db <- dplyr::tbl(sky_westminster, "parties") %>%  collect()
+#joining the tables 
+ent_pay <- left_join(ent_pay,parties_db,by=c('party_id'='id')) 
+#calculating the amount raised each year by each party 
+per_party <- ent_pay %>% 
+  filter(year>2019) %>% 
+  group_by(year,name.y) %>% 
+  summarise('total_year_donations'=sum(value)) %>% 
+  group_by(year) %>% 
+  mutate('prop'=total_year_donations/sum(total_year_donations)) %>% 
+  rename('name'=name.y)
+#finding the max for each year
+per_party%>% 
+  group_by(year) %>% 
+  filter(total_year_donations==max(total_year_donations)) %>% 
+```
+The conservative party raised each year (2020-2022) thethe greatest amount of money.
 
 I would like you to write code that generates the following table. 
 
@@ -155,11 +174,27 @@ I would like you to write code that generates the following table.
 knitr::include_graphics(here::here("images", "total_donations_table.png"), error = FALSE)
 ```
 
-
 ... and then, based on this data, plot the following graph. 
 
 ```{r echo=FALSE, out.width="80%"}
 knitr::include_graphics(here::here("images", "total_donations_graph.png"), error = FALSE)
+```
+```{r}
+#reordering and creating the plot
+per_party %>% mutate(name = fct_rev(fct_reorder(name,total_year_donations))) %>% 
+ggplot(aes(x=year, y=total_year_donations, fill=name))+
+  geom_bar(stat='identity',position=position_dodge())+
+  scale_y_continuous(labels = scales::dollar)+
+  labs(title ="Conservatives have captured the majority of political demands", 
+       subtitle = "Donations to political parties, 2020-2022")+
+  xlab(NULL)+
+  ylab(NULL)+
+  theme(plot.subtitle = element_text(size = 7),
+  axis.title = element_text(size = 7),
+  plot.title = element_text(size = 10),
+  legend.text = element_text(size = 7),
+  legend.title = element_text(size = 8)) +labs(fill = "Party")
+  theme_bw()
 ```
 
 This uses the default ggplot colour pallete, as I dont want you to worry about using the [official colours for each party](https://en.wikipedia.org/wiki/Wikipedia:Index_of_United_Kingdom_political_parties_meta_attributes). However, I would like you to ensure the parties are sorted according to total donations and not alphabetically. You may even want to remove some of the smaller parties that hardly register on the graph. Would facetting help you?  
