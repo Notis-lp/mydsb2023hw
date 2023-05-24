@@ -68,16 +68,83 @@ DBI::dbListTables(sky_westminster)
 ## Which MP has received the most amount of money? 
 
 You need to work with the `payments` and `members` tables and for now we just want the total among all years. To insert a new, blank chunk of code where you can write your beautiful code (and comments!), please use the following shortcut: `Ctrl + Alt + I` (Windows) or `cmd + option + I` (mac)
-
+```{r}
+#creating tables 
+payments_db <- dplyr::tbl(sky_westminster, "payments")
+members_db <- dplyr::tbl(sky_westminster, "members")
+#calculating the amount each MP has receive
+pay_sum <- payments_db %>% 
+  group_by(member_id) %>% 
+  summarise('amount' = sum(value)) 
+#joining the two tables
+pay_sum <- left_join(pay_sum,members_db,by=c('member_id'='id')) 
+#finding the name of the MP has received the most amount of money
+name <- pay_sum %>% 
+  slice_max(amount) %>% 
+  select(name.x) %>% 
+  pull
+```
+Theresa May has received the most money.
 
 ## Any `entity` that accounts for more than 5% of all donations?
 
 Is there any `entity` whose donations account for more than 5% of the total payments given to MPs over the 2020-2022 interval? Who are they and who did they give money to?
+```{r}
+#we don't have to bring it into memory but because its a small table we might as well
+payments_db<- payments_db %>%  collect()
+#splitting date
+payments_db <- payments_db %>% 
+  mutate(month = word(date,start=3,end=3,sep=fixed(" ")),
+         year = as.numeric(word(date,start=4,end=4,sep=fixed(" "))))
+#finding if there is an entity that gave more than 5%
+payments_db %>% 
+  group_by(entity) %>% 
+  summarise('amount' = sum(value)) %>% 
+  mutate('percentage'=amount/sum(amount)) %>% 
+  filter(percentage>=0.05) %>% 
+  select(entity)
+#finding the member id 
+id_m <- payments_db %>% 
+  filter(entity == 'Withers LLP') %>% 
+  group_by(member_id) %>% 
+  count() %>% 
+  select(member_id) %>% 
+  pull()
+#using the id to find the name of the mp
+members_db %>% 
+  filter(id==id_m) %>% 
+  select(name)
+  
+```
+Yes there is, and it's Withers LLP. They gave a total of £1.812.732 (5,25%) to Sir Geoffrey Cox.
 
 ## Do `entity` donors give to a single party or not?
 
 - How many distinct entities who paid money to MPS are there?
 - How many (as a number and %) donated to MPs belonging to a single party only?
+```{r}
+#finding how many distinct entities exist
+dist_ent <- payments_db %>% 
+  group_by(entity) %>% 
+  count() %>% 
+  nrow()
+#bringing it to memory 
+members_db <- members_db %>% collect()
+#joining
+ent_pay <- left_join(payments_db,members_db,by=c('member_id'='id')) 
+#finding in how many parties each entity has contributed and counting 
+#how many contributed to a single party only
+single <- ent_pay %>% 
+  group_by(entity) %>% 
+  count(party_id) %>% 
+  count(entity) %>% 
+  filter(n==1) %>% 
+  nrow()
+#calculating the percentage
+single/dist_ent
+```
+There are 2213 distinct entities.
+2036 entities donated to MPs belonging to a single party only, that's 92%
 
 
 ## Which party has raised the greatest amount of money in each of the years 2020-2022? 
