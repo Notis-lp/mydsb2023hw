@@ -333,7 +333,7 @@ urban_rural <- read_xlsx(here::here("data", "NCHSURCodes2013.xlsx")) %>%
 ```
 
 
-Each county belongs in seix diffent categoreis, with categories 1-4 being urban areas and categories 5-6 being rural, according to the following criteria captured in `x2013_code`
+Each county belongs in six different categories, with categories 1-4 being urban areas and categories 5-6 being rural, according to the following criteria captured in `x2013_code`
 
 Category name
 
@@ -351,6 +351,71 @@ Can you query the database, extract the relevant information, and reproduce the 
 knitr::include_graphics(here::here("images", "cfr-county-population.png"), error = FALSE)
 ```
 
+```{r}
+#gathering data and converting case_month to date
+temp <- cdc_data %>% 
+  filter((death_yn=="Yes" | death_yn=="No") & !is.na(res_state)) %>% 
+  mutate(case_month = as.Date(paste(case_month, "-01", sep=""))) %>% 
+  group_by(case_month,res_state,death_yn) %>%
+  count() %>% 
+  collect()
+
+urban_rural <- urban_rural %>% 
+  filter(!is.na(x2013_code)) %>% 
+  mutate(type = case_when(
+    x2013_code == 1 ~ "Large central metro",
+    x2013_code == 2 ~ "large fringe metron",
+    x2013_code == 3 ~ "Medium metro",
+    x2013_code == 4 ~ "Small metropolitan",
+    x2013_code == 5 ~ "Micropolitan",
+    x2013_code == 6 ~ "Noncore",
+    ))
+
+  
+temp <- left_join(temp,urban_rural,by=c('res_state'='state_abr'))
+#calculating the percentage for each category
+temp <- temp %>% 
+  group_by(case_month,type,death_yn) %>% 
+  count() %>% 
+  ungroup() %>% 
+  group_by(case_month,type) %>% 
+  mutate('total'=sum(n)) %>% 
+  rename('deaths'=n) %>% 
+  filter(death_yn=='Yes') %>% 
+  mutate('perc'=deaths/total) %>% 
+  drop_na()
+
+#wrong
+temp <- temp %>% 
+  group_by(case_month,type,death_yn) %>% 
+  summarise('n'=n(),
+            'pop'=sum(as.numeric(county_2012_pop))) %>% 
+  filter(!is.na(pop)& !is.na(type)) %>% 
+  ungroup() %>% 
+  group_by(case_month,type) %>% 
+  rename('deaths'=n) %>% 
+  filter(death_yn=='Yes') %>% 
+  mutate('perc'=deaths/pop) 
+
+#plotting
+p <- ggplot(temp,aes(x=case_month, y=perc, color=type))+
+  geom_line()+
+  facet_wrap(~type, scales="free")+
+  scale_y_continuous(labels = scales::percent)+
+  labs(title ="Covid CFR % by county population", caption="Source CDC")+
+  xlab(NULL)+
+  ylab(NULL)+
+  geom_text_repel(aes(label = round(perc,2)*100), 
+                  box.padding   = 0.15, 
+                  point.padding = 0.2,size=2)+
+  theme(axis.title = element_text(size = 7),
+    axis.text = element_text(size = 3), axis.text.x = element_text(size = 3),
+    plot.title = element_text(size = 8),
+    legend.text = element_text(size = 5)) +labs(size = 55) +
+  theme_light()+
+  theme(legend.position = "none")
+
+```
 
 
 ```{r echo=FALSE, out.width="100%"}
