@@ -354,13 +354,15 @@ knitr::include_graphics(here::here("images", "cfr-county-population.png"), error
 ```{r}
 #gathering data and converting case_month to date
 temp <- cdc_data %>% 
-  filter((death_yn=="Yes" | death_yn=="No") & !is.na(res_state)) %>% 
+  filter((death_yn=="Yes" | death_yn=="No")) %>% 
   mutate(case_month = as.Date(paste(case_month, "-01", sep=""))) %>% 
   group_by(case_month,res_state,death_yn) %>%
   count() %>% 
   collect()
 
-urban_rural <- urban_rural %>% 
+temp <- temp %>% drop_na()
+
+urban_rural2 <- urban_rural %>% 
   filter(!is.na(x2013_code)) %>% 
   mutate(type = case_when(
     x2013_code == 1 ~ "Large central metro",
@@ -372,9 +374,9 @@ urban_rural <- urban_rural %>%
     ))
 
   
-temp <- left_join(temp,urban_rural,by=c('res_state'='state_abr'))
+temp2 <- left_join(temp,urban_rural2,by=c('res_state'='state_abr'))
 #calculating the percentage for each category
-temp <- temp %>% 
+temp2 <- temp2 %>% 
   group_by(case_month,type,death_yn) %>% 
   count() %>% 
   ungroup() %>% 
@@ -398,7 +400,7 @@ temp <- temp %>%
   mutate('perc'=deaths/pop) 
 
 #plotting
-p <- ggplot(temp,aes(x=case_month, y=perc, color=type))+
+p <- ggplot(temp2,aes(x=case_month, y=perc, color=type))+
   geom_line()+
   facet_wrap(~type, scales="free")+
   scale_y_continuous(labels = scales::percent)+
@@ -420,6 +422,50 @@ p <- ggplot(temp,aes(x=case_month, y=perc, color=type))+
 
 ```{r echo=FALSE, out.width="100%"}
 knitr::include_graphics(here::here("images", "cfr-rural-urban.png"), error = FALSE)
+```
+```{r}
+urban_rural <- urban_rural %>% 
+  filter(!is.na(x2013_code)) %>% 
+  mutate(type = case_when(
+    x2013_code == 1 ~ "Urban",
+    x2013_code == 2 ~ "Urban",
+    x2013_code == 3 ~ "Urban",
+    x2013_code == 4 ~ "Urban",
+    x2013_code == 5 ~ "Rural",
+    x2013_code == 6 ~ "Rural",
+    ))
+
+temp <- left_join(temp,urban_rural,by=c('res_state'='state_abr'))
+
+#calculating the percentage for each category
+temp <- temp %>% 
+  group_by(case_month,type,death_yn) %>% 
+  count() %>% 
+  ungroup() %>% 
+  group_by(case_month,type) %>% 
+  mutate('total'=sum(n)) %>% 
+  rename('deaths'=n) %>% 
+  filter(death_yn=='Yes') %>% 
+  mutate('perc'=deaths/total) %>% 
+  drop_na()
+
+ggplot(temp,aes(x=case_month, y=perc, color=type))+
+  geom_line()+
+  scale_y_continuous(labels = scales::percent)+
+  labs(title ="Covid CFR % by county population", caption="Source CDC", color="Counties")+
+  xlab(NULL)+
+  ylab(NULL)+
+  geom_text_repel(aes(label = round(perc,2)*100), 
+                  box.padding   = 0.15, 
+                  point.padding = 0.2,
+                  size=2,
+                  color="black")+
+  theme(axis.title = element_text(size = 7),
+    axis.text = element_text(size = 3), axis.text.x = element_text(size = 3),
+    plot.title = element_text(size = 8),
+    legend.text = element_text(size = 5)) +labs(size = 55) +
+  theme_light()
+
 ```
 
 
