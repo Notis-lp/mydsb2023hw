@@ -34,6 +34,7 @@ library(robotstxt) # check if we're allowed to scrape the data
 library(scales)
 library(sf)
 library(readxl)
+library(ggrepel)
 ```
 
 # Money in UK politics
@@ -232,12 +233,96 @@ Can you query the database and replicate the following plot?
 ```{r echo=FALSE, out.width="100%"}
 knitr::include_graphics(here::here("images", "covid-CFR-ICU.png"), error = FALSE)
 ```
+```{r}
+#collecting the data we nned from the database
+d <- cdc_data %>% 
+  filter((icu_yn=="Yes" | icu_yn=="No") & 
+           (death_yn=="Yes" | death_yn=="No") & 
+           (sex=="Male" | sex=="Female") & 
+           (age_group!="Missing")) %>% 
+  group_by(age_group,sex,icu_yn,death_yn) %>% 
+  count() %>% 
+  collect()
+#calculating the percentage for each category
+d <- d %>% 
+  group_by(age_group,sex,icu_yn) %>% 
+  mutate('total'=sum(n)) %>% 
+  rename('deaths'=n) %>% 
+  filter(death_yn=='Yes') %>% 
+  mutate('perc'=deaths/total) %>% 
+
+d<- d %>% 
+  mutate(icu_yn = case_when(
+    icu_yn %in% c("Yes") ~ "ICU Admission",
+    icu_yn %in% c("No") ~ "No ICU Admission", TRUE~icu_yn))
+#plotting
+ggplot(d,aes(x=perc, y=age_group))+
+  geom_bar(stat="identity", position = "dodge", fill='tomato')+
+  facet_grid(icu_yn~sex)+
+  scale_x_continuous(labels = scales::percent)+
+  labs(title ="Covid CFR % per age group, sex and ICU Admission", caption="Source CDC")+
+  xlab(NULL)+
+  ylab(NULL)+
+    geom_text(aes(label = round(perc,2)*100),
+             hjust = 1, 
+             colour = "black", 
+             size = 3)+
+  theme(plot.caption = element_text(size = 6),
+    axis.text = element_text(size = 7), axis.text.x = element_text(size = 7),
+    plot.title = element_text(size = 10)) +labs(size = 8)+
+  theme_light()
+
+  
+  
+```
 
 The previous plot is an aggregate plot for all three years of data. What if we wanted to plot Case Fatality Ratio (CFR) over time? Write code that collects the relevant data from the database and plots the following
 
 
 ```{r echo=FALSE, out.width="100%"}
 knitr::include_graphics(here::here("images", "cfr-icu-overtime.png"), error = FALSE)
+```
+```{r}
+#gathering data and converting case_month to date
+w <- cdc_data %>% 
+  filter((icu_yn=="Yes" | icu_yn=="No") & 
+           (death_yn=="Yes" | death_yn=="No") & 
+           (sex=="Male" | sex=="Female") & 
+           (age_group!="Missing")) %>%
+  mutate(case_month = as.Date(paste(case_month, "-01", sep=""))) %>% 
+  group_by(case_month,age_group,sex,icu_yn,death_yn) %>%
+  count() %>% 
+  collect()
+
+#calculating the percentage for each category
+w <- w %>% 
+  group_by(case_month,age_group,sex,icu_yn) %>% 
+  mutate('total'=sum(n)) %>% 
+  rename('deaths'=n) %>% 
+  filter(death_yn=='Yes') %>% 
+  mutate('perc'=deaths/total) 
+
+#renaming column icy_yn values
+w<- w %>% 
+  mutate(icu_yn = case_when(
+    icu_yn %in% c("Yes") ~ "ICU Admission",
+    icu_yn %in% c("No") ~ "No ICU Admission", TRUE~icu_yn))
+
+#plotting
+ggplot(w,aes(x=case_month, y=perc, color=age_group))+
+  geom_line()+
+  facet_grid(icu_yn~sex)+
+  scale_y_continuous(labels = scales::percent)+
+  labs(title ="Covid CFR % per age group, sex and ICU Admission", caption="Source CDC", color= "Age Group")+
+  xlab(NULL)+
+  ylab(NULL)+
+  geom_text_repel(aes(label = round(perc,2)*100), 
+                  box.padding   = 0.15, 
+                  point.padding = 0.2,size=2)+
+  theme(plot.caption = element_text(size = 6),
+    axis.text = element_text(size = 7), axis.text.x = element_text(size = 7),
+    plot.title = element_text(size = 10)) +labs(size = 8)+
+  theme_light()
 ```
 
 
