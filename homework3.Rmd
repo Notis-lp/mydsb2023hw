@@ -356,7 +356,7 @@ knitr::include_graphics(here::here("images", "cfr-county-population.png"), error
 temp <- cdc_data %>% 
   filter((death_yn=="Yes" | death_yn=="No")) %>% 
   mutate(case_month = as.Date(paste(case_month, "-01", sep=""))) %>% 
-  group_by(case_month,res_state,death_yn) %>%
+  group_by(case_month,county_fips_code,death_yn) %>%
   count() %>% 
   collect()
 
@@ -374,30 +374,19 @@ urban_rural2 <- urban_rural %>%
     ))
 
   
-temp2 <- left_join(temp,urban_rural2,by=c('res_state'='state_abr'))
+temp2 <- left_join(temp,urban_rural2,by=c('county_fips_code'='fips_code'))
 #calculating the percentage for each category
 temp2 <- temp2 %>% 
+  filter(case_month>'2020-01-01') %>% 
   group_by(case_month,type,death_yn) %>% 
-  count() %>% 
+  summarise('s'=sum(n)) %>% 
   ungroup() %>% 
   group_by(case_month,type) %>% 
-  mutate('total'=sum(n)) %>% 
-  rename('deaths'=n) %>% 
+  mutate('total'=sum(s)) %>% 
+  rename('deaths'=s) %>% 
   filter(death_yn=='Yes') %>% 
-  mutate('perc'=deaths/total) %>% 
+  mutate('perc'=deaths/total) %>%
   drop_na()
-
-#wrong
-temp <- temp %>% 
-  group_by(case_month,type,death_yn) %>% 
-  summarise('n'=n(),
-            'pop'=sum(as.numeric(county_2012_pop))) %>% 
-  filter(!is.na(pop)& !is.na(type)) %>% 
-  ungroup() %>% 
-  group_by(case_month,type) %>% 
-  rename('deaths'=n) %>% 
-  filter(death_yn=='Yes') %>% 
-  mutate('perc'=deaths/pop) 
 
 #plotting
 p <- ggplot(temp2,aes(x=case_month, y=perc, color=type))+
@@ -435,21 +424,22 @@ urban_rural <- urban_rural %>%
     x2013_code == 6 ~ "Rural",
     ))
 
-temp <- left_join(temp,urban_rural,by=c('res_state'='state_abr'))
+temp3 <- left_join(temp,urban_rural,by=c('county_fips_code'='fips_code'))
 
 #calculating the percentage for each category
-temp <- temp %>% 
+temp3 <- temp3 %>% 
+  filter(case_month>'2020-01-01') %>% 
   group_by(case_month,type,death_yn) %>% 
-  count() %>% 
+  summarise('s'=sum(n)) %>% 
   ungroup() %>% 
   group_by(case_month,type) %>% 
-  mutate('total'=sum(n)) %>% 
-  rename('deaths'=n) %>% 
+  mutate('total'=sum(s)) %>% 
+  rename('deaths'=s) %>% 
   filter(death_yn=='Yes') %>% 
   mutate('perc'=deaths/total) %>% 
   drop_na()
 
-ggplot(temp,aes(x=case_month, y=perc, color=type))+
+ggplot(temp3,aes(x=case_month, y=perc, color=type))+
   geom_line()+
   scale_y_continuous(labels = scales::percent)+
   labs(title ="Covid CFR % by county population", caption="Source CDC", color="Counties")+
@@ -488,11 +478,17 @@ paths_allowed("https://www.opensecrets.org")
 base_url <- "https://www.opensecrets.org/political-action-committees-pacs/foreign-connected-pacs/2022"
 
 contributions_tables <- base_url %>%
-  read_html() 
-
+  read_html() %>% 
+  html_nodes(css="table") %>% # this will isolate all tables on page
+  html_table()
 ```
 
 - First, make sure you can scrape the data for 2022. Use janitor::clean_names() to rename variables scraped using `snake_case` naming. 
+```{r}
+#cleaning names
+contributions <- contributions_tables[[1]] %>% 
+  janitor::clean_names()
+```
 
 - Clean the data: 
 
@@ -500,16 +496,13 @@ contributions_tables <- base_url %>%
     -   Separate the `country_of_origin_parent_company` into two such that country and parent company appear in different columns for country-level analysis.
 
 ```{r, eval=FALSE}
-# write a function to parse_currency
+# function to parse_currency
 parse_currency <- function(x){
   x %>%
-    
     # remove dollar signs
     str_remove("\\$") %>%
-    
     # remove all occurrences of commas
     str_remove_all(",") %>%
-    
     # convert to numeric
     as.numeric()
 }
@@ -526,41 +519,77 @@ contributions <- contributions %>%
     repubs = parse_currency(repubs)
   )
 ```
-
-
-
-
 -   Write a function called `scrape_pac()` that scrapes information from the Open Secrets webpage for foreign-connected PAC contributions in a given year. This function should
 
     -   have one input: the URL of the webpage and should return a data frame.
     -   add a new column to the data frame for `year`. We will want this information when we ultimately have data from all years, so this is a good time to keep track of it. Our function doesn't take a year argument, but the year is embedded in the URL, so we can extract it out of there, and add it as a new column. Use the `str_sub()` function to extract the last 4 characters from the URL. You will probably want to look at the help for this function to figure out how to specify "last 4 characters".
+```{r}
+scrape_pac <- function(url){
+  #getting the data and cleaning 
+  contrib <- url %>%
+    read_html() %>% 
+    html_nodes(css="table") %>% # this will isolate all tables on page
+    html_table()
+  #cleaning names
+  contrib <- contrib[[1]] %>% 
+    janitor::clean_names()
+  #getting year from url
+  year <- str_sub(url,start=-4L,end=-1L)
+  #adding year column
+  contrib <- contrib %>% 
+    mutate('year'=as.numeric(year))
+  return(contrib)
+}
+
+url<-"https://www.opensecrets.org/political-action-committees-pacs/foreign-connected-pacs/2022"
+contrib <- scrape_pac(url)
+```
 
 -   Define the URLs for 2022, 2020, and 2000 contributions. Then, test your function using these URLs as inputs. Does the function seem to do what you expected it to do?
+```{r}
+#defining the URLs for 2022, 2020, and 2000 contributions
+url00<-"https://www.opensecrets.org/political-action-committees-pacs/foreign-connected-pacs/2000"
+url20<-"https://www.opensecrets.org/political-action-committees-pacs/foreign-connected-pacs/2020"
+url22<-"https://www.opensecrets.org/political-action-committees-pacs/foreign-connected-pacs/2022"
+#checking the function for 2022, 2020, and 2000 contributions
+contrib00 <- scrape_pac(url00)
+contrib20 <- scrape_pac(url20)
+contrib22 <- scrape_pac(url22)
+```
+Yes it works as expected.
 
 -   Construct a vector called `urls` that contains the URLs for each webpage that contains information on foreign-connected PAC contributions for a given year.
+```{r}
+#constructing the vector
+y = as.numeric(format(Sys.Date(),"%Y"))
+urls<-c()
+for (i in 2001:y-1){
+  url<-paste("https://www.opensecrets.org/political-action-committees-pacs/foreign-connected-pacs/",
+             as.character(i),sep="");
+   urls <- append(urls,url)}
+
+
+urls[1]
+map(.urls,~paste("https://www.opensecrets.org/political-action-committees-pacs/foreign-connected-pacs/",
+             as.character(.url),sep=""))
+```
 
 -   Map the `scrape_pac()` function over `urls` in a way that will result in a data frame called `contributions_all`.
+```{r}
+contributions_all<-map(urls,~scrape_pac(.))
+#convert to dataframe
+contributions_all <- do.call(rbind,contributions_all)
+```
 
 -   Write the data frame to a csv file called `contributions-all.csv` in the `data` folder.
 
+```{r}
+write.csv(contributions_all, "data/contributions-all.csv", row.names=FALSE)
+```
 
 # Scraping consulting jobs
 
 The website [https://www.consultancy.uk/jobs/](https://www.consultancy.uk/jobs) lists job openings for consulting jobs.
-
-```{r}
-#| label: consulting_jobs_url
-#| eval: false
-
-library(robotstxt)
-paths_allowed("https://www.consultancy.uk") #is it ok to scrape?
-
-base_url <- "https://www.consultancy.uk/jobs/page/1"
-
-listings_html <- base_url %>%
-  read_html()
-
-```
 
 Identify the CSS selectors in order to extract the relevant information from this page, namely
 
@@ -568,22 +597,47 @@ Identify the CSS selectors in order to extract the relevant information from thi
 1. firm
 1. functional area
 1. type
+```{r}
+library(robotstxt)
+
+base_url <- "https://www.consultancy.uk/jobs/page/1"
+listings <- base_url %>%
+  read_html()
+#job 
+listings %>%
+  html_elements(css = "#vacaturenaam")
+
+#firm
+listings %>%
+  html_elements(css = "#bedrijf")
+
+#functional area
+listings %>%
+  html_elements(css = "th.hide-tablet-and-less")
+
+#type
+listings %>%
+  html_elements(css = "th.hide-tablet-landscape")
+```
+
 
 Can you get all pages of ads, and not just the first one, `https://www.consultancy.uk/jobs/page/1` into a dataframe?
-
+yes already done.
 
 -   Write a function called `scrape_jobs()` that scrapes information from the webpage for consulting positions. This function should
 
     -   have one input: the URL of the webpage and should return a data frame with four columns (variables): job, firm, functional area, and type
 
     -   Test your function works with other pages too, e.g., https://www.consultancy.uk/jobs/page/2. Does the function seem to do what you expected it to do?
+    Yes
 
     -   Given that you have to scrape `...jobs/page/1`, `...jobs/page/2`, etc., define your URL so you can join multiple stings into one string, using `str_c()`. For instnace, if `page` is 5, what do you expect the following code to produce?
-    
 ```
 base_url <- "https://www.consultancy.uk/jobs/page/1"
 url <- str_c(base_url, page)
 ```
+I expect it to return this url:https://www.consultancy.uk/jobs/page/15. it combines the 2 strings
+The url i should use to combine strings is https://www.consultancy.uk/jobs/page/
 
 -   Construct a vector called `pages` that contains the numbers for each page available
 
@@ -591,6 +645,50 @@ url <- str_c(base_url, page)
 -   Map the `scrape_jobs()` function over `pages` in a way that will result in a data frame called `all_consulting_jobs`.
 
 -   Write the data frame to a csv file called `all_consulting_jobs.csv` in the `data` folder.
+
+
+```{r}
+#| label: consulting_jobs_url
+#| eval: false
+paths_allowed("https://www.consultancy.uk") #is it ok to scrape?
+
+base_url <- "https://www.consultancy.uk/jobs/page/1"
+
+#creating a vector with the urls
+pages<-c()
+for (i in 1:8){
+  url<-paste("https://www.consultancy.uk/jobs/page/",
+             as.character(i),sep="");
+   pages <- append(pages,url)}
+
+#scraping function
+scrape_jobs <- function(url){
+  #getting the data and cleaning 
+  listings <- url %>%
+    read_html() %>% 
+    html_nodes(css="table") %>% # this will isolate all tables on page
+    html_table()
+  #cleaning names
+  listings <- listings[[1]] %>% 
+    janitor::clean_names()
+  return(listings)
+}
+
+#defining a test URL for page 5
+url5<-"https://www.consultancy.uk/jobs/page/5"
+#checking the function for page 5 
+jobscheck <- scrape_jobs(url5)
+
+#gathering all data
+jobs<-map(pages,~scrape_jobs(.))
+
+#convert to dataframe
+jobs <- do.call(rbind,jobs)
+
+#writing the data frame to a csv
+write.csv(jobs, "data/all_consulting_jobs.csv", row.names=FALSE)
+```
+
 
 
 
@@ -613,13 +711,14 @@ There is a lot of explanatory text, comments, etc. You do not need these, so del
 
 # Details
 
--   Who did you collaborate with: TYPE NAMES HERE
--   Approximately how much time did you spend on this problem set: ANSWER HERE
--   What, if anything, gave you the most trouble: ANSWER HERE
+-   Who did you collaborate with: Nobody
+-   Approximately how much time did you spend on this problem set: a lot 
+-   What, if anything, gave you the most trouble: 
 
 **Please seek out help when you need it,** and remember the [15-minute rule](https://dsb2023.netlify.app/syllabus/#the-15-minute-rule){target="_blank"}. You know enough R (and have enough examples of code from class and your readings) to be able to do this. If you get stuck, ask for help from others, post a question on Slack-- and remember that I am here to help too!
 
 > As a true test to yourself, do you understand the code you submitted and are you able to explain it to someone else?
+Yes
 
 # Rubric
 
