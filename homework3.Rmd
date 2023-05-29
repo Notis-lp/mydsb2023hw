@@ -1,8 +1,12 @@
 ---
-title: "Homework 3: Databases, web scraping, and a basic Shiny app"
+title: 'Homework 3: Databases, web scraping, and a basic Shiny app'
 author: "Notis Lapatas"
-date: "`r Sys.Date()`"
+date: '`r Sys.Date()`'
 output:
+  word_document:
+    toc: yes
+  pdf_document:
+    toc: yes
   html_document:
     theme: flatly
     highlight: zenburn
@@ -10,8 +14,6 @@ output:
     toc: yes
     toc_float: yes
     code_folding: show
-  pdf_document:
-    toc: yes
 ---
 
 ```{r}
@@ -35,6 +37,7 @@ library(scales)
 library(sf)
 library(readxl)
 library(ggrepel)
+options(scipen=999)
 ```
 
 # Money in UK politics
@@ -404,11 +407,7 @@ ggplot(temp3,aes(x=case_month, y=perc, color=type))+
 ```
 # Money in US politics
 
-```{r, eval=FALSE}
-#| label: allow-scraping-opensecrets
-#| warning: false
-#| message: false
-
+```{r}
 library(robotstxt)
 paths_allowed("https://www.opensecrets.org")
 
@@ -422,7 +421,8 @@ contributions_tables <- base_url %>%
 
 ```{r}
 #cleaning names
-contributions <- contributions_tables[[1]] %>% 
+contributions <- contributions_tables[[1]]
+contributions %>% 
   janitor::clean_names()
 ```
 
